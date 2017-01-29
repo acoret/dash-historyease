@@ -1,0 +1,115 @@
+#!/usr/bin/lua
+PATH='/usr/local/bin/'
+INSTALL_PATH='/usr/local/bin/'
+local args_aim
+if io.open(PATH.."DASHHISTORY_set.lua") then
+  set=loadfile (PATH.."DASHHISTORY_set")
+  set()
+end
+--init
+if not tool then
+  tool='sqlite3'
+end
+--for test
+--tool='echo sqlite3'
+--please --it
+if not os.execute("which sqlite3 1>>/dev/null 2>>/dev/null") then
+  print("抱歉哦，你好像没有sqlite3哦，请安装它，当然也有可能是which出问题啦哈哈＾ｖ＾．\n请检查sqlite3,并且检查tool的配置哦，你可以修改tool为绝对路径，然后注释掉这个which判断")
+end
+HELP=[[Usage: Dash_history [OPTIONS] [aim_name]
+    It will print what it done.
+    该工具依赖sqlite3哦，请在使用该工具前安装它哦！
+    在使用该脚本前，请打开该脚本修改第二行的PATH为该脚本的储藏目录
+      install,会把自己复制到默认安装目录哦，如果要修改安装目录请修改脚本在第三行(默认安装在/usr/local/bin/),在此之前请cd进该脚本目录哦
+      -v,不会打印任何东西，，，没错没有版本号哦
+      -h,--help会打印这个不靠谱的帮助给你
+      -p,--path,将会设置默认控制的sqlite文件位置，默认为~/.local/share/zeitgeist/activity.sqlite
+      -w,--where,会设置SQL命令里的WHERE参数,默认为uri
+      -f,--from,会设置SQL命令里的FROM参数,默认为value
+      -l,--list,如果带有该参数那么就不会删除目标数据，而只是打印
+      -m,--match,后接目标文件名，如果加了match那么它会将*转换为%，如果没有该参数将不进行匹配
+      记住，这个SQL匹配的话它会默认给你在头尾加上%匹配符]]
+args=arg
+if not path then
+  path='~/.local/share/zeitgeist/activity.sqlite'
+end
+if not args then
+  print(HELP)
+end
+list_args={}--0-path位是path设置，１-id是目标id，２-aim是指全匹配，3-match是前后匹配且将＊切换成％
+for i,v in ipairs (args) do
+  if v=='install' then
+    os.execute("sudo cp ${pwd}/Dash_history.lua /usr/local/bin/Dash_history;sudo chmod a+x /usr/local/bin/Dash_history;")
+    return
+  elseif v=='--help' or v=='-h' and not args_aim then
+    print(HELP)
+  return
+  elseif args_aim then
+    list_args[args_aim]=v
+    args_aim=nil
+  elseif v=='--path' or v=='-p' then
+    args_aim=0
+  elseif v=='--where' or v=='-w' then
+    args_aim=1
+  elseif v=='--from' or v=='-f' then
+    args_aim=2
+  elseif v=='--match' or v=='-m' then
+    args_aim=3
+    list_args['match']=true
+  elseif v=='--list' or v=='-l' then
+    if (args_aim) then
+      print(HELP)
+      return
+    end
+    list_args['list']=true
+  elseif v=="--test" then
+    tool="echo sqlite3"
+  elseif not args[i+1] then
+  args_aim=3
+  else
+    print(HELP)
+    return
+  end
+end
+if args_aim==3 and not list_args[3] then
+  list_args[3]=arg[#arg]
+end
+if (not list_args[3]) then
+  print(HELP)
+  return
+end
+SQL_command={"DELETE"}
+if list_args['list'] then
+  SQL_command[#SQL_command]="SELECT"
+  SQL_command[#SQL_command+1]="*"
+end
+SQL_command[#SQL_command+1]="FROM"
+SQL_command[#SQL_command+1]="uri"
+if list_args[1] then
+  SQL_command[#SQL_command]=list_args[1]
+end
+SQL_command[#SQL_command+1]="WHERE"
+SQL_command[#SQL_command+1]="value"
+if list_args[2] then
+  SQL_command[#SQL_command]=list_args[2]
+end
+SQL_command[#SQL_command+1]="="
+aim_match="*"
+if list_args['match'] then
+  aim_match="%"
+  SQL_command[#SQL_command]="LIKE"
+end
+SQL_command[#SQL_command+1]=string.gsub(list_args[3],"*",aim_match)
+if list_args['match'] then
+  SQL_command[#SQL_command]="\'%"..SQL_command[#SQL_command].."%\'"
+end
+--path set and write
+if list_args[0] then
+  path=list_args[0]
+
+  local file=io.open("DASHHISTORY_set.lua",'w')
+  file:write("path="..path..'\n')
+  file:write("PATH="..PATH)
+end
+
+os.execute(tool.." "..path.." \""..table.concat(SQL_command," ").."\"")
